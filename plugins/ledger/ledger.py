@@ -1,20 +1,14 @@
-from binascii import unhexlify
 from binascii import hexlify
 from struct import pack,unpack
-from sys import stderr
-from time import sleep
 
 import electrum
-from electrum.account import BIP32_Account
-from electrum.bitcoin import EncodeBase58Check, DecodeBase58Check, public_key_to_bc_address, bc_address_to_hash_160
+from electrum.bitcoin import EncodeBase58Check, DecodeBase58Check
 from electrum.i18n import _
 from electrum.plugins import BasePlugin, hook
-from electrum.transaction import deserialize
-from electrum.wallet import BIP32_HD_Wallet, BIP32_Wallet
+from electrum.wallet import BIP44_Wallet
 
 from electrum.util import format_satoshis_plain, print_error, print_msg
 import hashlib
-import threading
 
 try:
     from btchip.btchipComm import getDongle, DongleWait
@@ -30,15 +24,13 @@ except ImportError:
     BTCHIP = False
 
 
-class BTChipWallet(BIP32_HD_Wallet):
+class BTChipWallet(BIP44_Wallet):
     wallet_type = 'btchip'
-    root_derivation = "m/44'/0'"
 
     def __init__(self, storage):
-        BIP32_HD_Wallet.__init__(self, storage)
+        BIP44_Wallet.__init__(self, storage)
         self.transport = None
         self.client = None
-        self.mpk = None
         self.device_checked = False
         self.signing = False
         self.force_watching_only = False
@@ -57,10 +49,6 @@ class BTChipWallet(BIP32_HD_Wallet):
     def get_action(self):
         if not self.accounts:
             return 'create_accounts'
-
-    def can_sign_xpubkey(self, x_pubkey):
-        xpub, sequence = BIP32_Account.parse_xpubkey(x_pubkey)
-        return xpub in self.master_public_keys.values()
 
     def can_create_accounts(self):
         return False
@@ -143,10 +131,6 @@ class BTChipWallet(BIP32_HD_Wallet):
             self.proper_device = False
         return self.client
 
-    def address_id(self, address):
-        account_id, (change, address_index) = self.get_address_index(address)
-        return "44'/0'/%s'/%d/%d" % (account_id, change, address_index)
-
     def derive_xkeys(self, root, derivation, password):
         derivation = derivation.replace(self.root_name,"44'/0'/")
         xpub = self.get_public_key(derivation)
@@ -186,27 +170,15 @@ class BTChipWallet(BIP32_HD_Wallet):
 
         return EncodeBase58Check(xpub)
 
-    def get_master_public_key(self):
-        try:
-            if not self.mpk:
-                self.mpk = self.get_public_key("44'/0'")
-            return self.mpk
-        except Exception, e:
-            self.give_error(e, True)
-
     def i4b(self, x):
         return pack('>I', x)
-
-    def add_keypairs(self, tx, keypairs, password):
-        #do nothing - no priv keys available
-        pass
 
     def decrypt_message(self, pubkey, message, password):
         self.give_error("Not supported")
 
     def sign_message(self, address, message, password):
         if self.has_seed():
-            return BIP32_HD_Wallet.sign_message(self, address, message, password)
+            return BIP44_Wallet.sign_message(self, address, message, password)
         use2FA = False
         self.signing = True
         self.get_client() # prompt for the PIN before displaying the dialog if necessary
@@ -258,7 +230,7 @@ class BTChipWallet(BIP32_HD_Wallet):
 
     def sign_transaction(self, tx, password):
         if self.has_seed():
-            return BIP32_HD_Wallet.sign_transaction(self, tx, password)
+            return BIP44_Wallet.sign_transaction(self, tx, password)
         if tx.is_complete():
             return
         #if tx.error:
