@@ -68,18 +68,18 @@ Builder.load_string('''
             id: grid_logo
             cols: 1
             pos_hint: {'center_y': .5}
-            size_hint: 1, .42
+            size_hint: 1, .1
             #height: self.minimum_height
-            Image:
-                id: logo_img
-                mipmap: True
-                allow_stretch: True
-                size_hint: 1, None
-                height: '110dp'
-                source: 'atlas://gui/kivy/theming/light/electrum_icon640'
-            Widget:
-                size_hint: 1, None
-                height: 0 if stepper.opacity else dp(15)
+            #Image:
+            #    id: logo_img
+            #    mipmap: True
+            #    allow_stretch: True
+            #    size_hint: 1, None
+            #    height: '110dp'
+            #    source: 'atlas://gui/kivy/theming/light/electrum_icon640'
+            #Widget:
+            #    size_hint: 1, None
+            #    height: 0 if stepper.opacity else dp(15)
             Label:
                 color: root.text_color
                 opacity: 0 if stepper.opacity else 1
@@ -148,12 +148,15 @@ Builder.load_string('''
         spacing: '12dp'
         size_hint: 1, None
         height: self.minimum_height
-        WizardTextInput:
-            id: text_input_seed
-            size_hint: 1, None
-            height: '110dp'
-            hint_text:
-                _('Enter your seedphrase')
+        Label:
+            id: seed_label
+            text: ''
+        #WizardTextInput:
+        #    id: text_input_seed
+        #    size_hint: 1, None
+        #    height: '110dp'
+        #    hint_text:
+        #        _('Enter your seedphrase')
             on_text: root._trigger_check_seed()
         Label:
             font_size: '12sp'
@@ -183,6 +186,10 @@ Builder.load_string('''
             id: next
             text: _('Next')
             root: root
+
+    VKeyboard:
+        id: kb
+        layout: 'data/keyboards/l1.json'
 
 
 <ShowSeedDialog>
@@ -313,22 +320,27 @@ class RestoreSeedDialog(WizardDialog):
         self.ids.next.disabled = not bool(self._test(self.get_seed_text()))
 
     def get_seed_text(self):
-        ti = self.ids.text_input_seed
+        ti = self.ids.seed_label
         text = unicode(ti.text).strip()
         text = ' '.join(text.split())
         return text
 
     def scan_seed(self):
         def on_complete(text):
-            self.ids.text_input_seed.text = text
+            self.ids.seed_label.text = text
         app = App.get_running_app()
         app.scan_qr(on_complete)
 
     def on_parent(self, instance, value):
         if value:
-            tis = self.ids.text_input_seed
-            tis.focus = True
-            tis._keyboard.bind(on_key_down=self.on_key_down)
+
+            #kb = Window.request_keyboard(self._keyboard_close, self)
+            kb = self.ids.kb
+            kb.bind(on_key_down=self.on_key_down)
+            #if kb.widget:
+            #    vkeyboard = kb.widget
+            #    vkeyboard.layout = 'data/keyboards/l1.json'
+
             stepper = self.ids.stepper
             stepper.opacity = 1
             stepper.source = ('atlas://gui/kivy/theming'
@@ -338,26 +350,28 @@ class RestoreSeedDialog(WizardDialog):
             app = App.get_running_app()
             #app.navigation_higherarchy.append(_back)
 
+    #def _keyboard_close(self):
+    #    print "kb close"
+
     def on_key_down(self, keyboard, keycode, key, modifiers):
-        if keycode[0] in (13, 271):
-            self.on_enter()
-            return True
+        print keycode, key, modifiers
+        #if keycode[0] in (13, 271):
+        #    self.on_enter()
+        #    return True
+        text = self.ids.seed_label.text
+        if key == 'backspace':
+            text = text[:-1]
+        else:
+            text+= key
+        self.ids.seed_label.text = text
 
     def on_enter(self):
-        #self._remove_keyboard()
         # press next
         next = self.ids.next
         if not next.disabled:
             next.dispatch('on_release')
 
-    def _remove_keyboard(self):
-        tis = self.ids.text_input_seed
-        if tis._keyboard:
-            tis._keyboard.unbind(on_key_down=self.on_key_down)
-            tis.focus = False
-
     def close(self):
-        self._remove_keyboard()
         app = App.get_running_app()
         #if self._back in app.navigation_higherarchy:
         #    app.navigation_higherarchy.pop()
