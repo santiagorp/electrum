@@ -256,11 +256,22 @@ class InstallWizard(QDialog, MessageBoxMixin, WizardBase):
         Return a a tuple (action, kind_index).  Action is 'create' or
         'restore', and kind the index of the wallet kind chosen."""
 
-        actions = [_("Create a new wallet"),
-                   _("Restore a wallet or import keys")]
+        std_actions = [_("Create a new wallet"),
+                       _("Restore a wallet or import keys")]
+        hw_actions = [_("Create a wallet for a new or used device"),
+                      _("Restore wallet from seed (no device needed)")]
+        actions_clayout = ChoicesLayout(_("What do you want to do?"),
+                                        std_actions)
         title = _("Electrum could not find an existing wallet.")
-        actions_clayout = ChoicesLayout(_("What do you want to do?"), actions)
-        wallet_clayout = ChoicesLayout(_("Wallet kind:"), wallet_kinds)
+
+        def on_kind_clicked(clayout, index):
+            actions = hw_actions if index == 3 else std_actions
+            buttons = actions_clayout.group.buttons()
+            for button, text in zip(buttons, actions):
+                button.setText(text)
+
+        wallet_clayout = ChoicesLayout(_("Wallet kind:"), wallet_kinds,
+                                       on_clicked=on_kind_clicked)
 
         vbox = QVBoxLayout()
         vbox.addLayout(actions_clayout.layout())
@@ -270,26 +281,15 @@ class InstallWizard(QDialog, MessageBoxMixin, WizardBase):
         action = ['create', 'restore'][actions_clayout.selected_index()]
         return action, wallet_clayout.selected_index()
 
-    def query_hw_wallet_choice(self, msg, action, choices):
-        actions = [_("Initialize a new or wiped device"),
-                   _("Use a device you have already set up"),
-                   _("Restore Electrum wallet from device seed words")]
-        default_action = 1 if action == 'create' else 2
-        actions_clayout = ChoicesLayout(_("What do you want to do?"), actions,
-                                        checked_index=default_action)
+    def query_hw_wallet_choice(self, msg, choices):
         wallet_clayout = ChoicesLayout(msg, choices)
 
         vbox = QVBoxLayout()
-        vbox.addLayout(actions_clayout.layout())
         vbox.addLayout(wallet_clayout.layout())
         self.set_main_layout(vbox)
         self.next_button.setEnabled(len(choices) != 0)
 
-        if actions_clayout.selected_index() == 2:
-            action = 'restore'
-        else:
-            action = 'create'
-        return action, wallet_clayout.selected_index()
+        return wallet_clayout.selected_index()
 
     def request_many(self, n, xpub_hot=None):
         vbox = QVBoxLayout()

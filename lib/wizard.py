@@ -77,13 +77,8 @@ class WizardBase(PrintError):
         Return the index of the choice."""
         raise NotImplementedError
 
-    def query_hw_wallet_choice(self, msg, action, choices):
-        """Asks the user which hardware wallet kind they are using.  Action is
-        'create' or 'restore' from the initial screen.  As this is
-        confusing for hardware wallets ask a new question with the
-        three possibilities Initialize ('create'), Use ('create') or
-        Restore a software-only wallet ('restore').  Return a pair
-        (action, choice)."""
+    def query_hw_wallet_choice(self, msg, choices):
+        """Asks the user which hardware wallet kind they are using."""
         raise NotImplementedError
 
     def show_and_verify_seed(self, seed):
@@ -214,7 +209,7 @@ class WizardBase(PrintError):
             # on the prior choice :)
             hw_wallet_types, choices = self.plugins.hardware_wallets(action)
             msg = _('Select the type of hardware wallet: ')
-            action, choice = self.query_hw_wallet_choice(msg, action, choices)
+            choice = self.query_hw_wallet_choice(msg, choices)
             wallet_type = hw_wallet_types[choice]
         elif kind == 'twofactor':
             wallet_type = '2fa'

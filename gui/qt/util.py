@@ -272,7 +272,7 @@ class ChoicesLayout(object):
                 button.setChecked(True)
 
         if on_clicked:
-            group.buttonClicked.connect(partial(on_clicked, self))
+            group.buttonClicked[int].connect(partial(on_clicked, self))
 
         self.vbox = vbox
 
