@@ -2760,6 +2760,31 @@ class ElectrumWindow(QMainWindow, PrintError):
         can_edit_fees_cb.setToolTip(_('This option lets you edit fees in the send tab.'))
         tx_widgets.append((can_edit_fees_cb, None))
 
+        add_classic_tip_cb = QCheckBox(_('Send tip to last bitcoin classic miner'))
+        add_classic_tip_cb.setChecked(self.config.get('send_classic_tip', False))
+        #def on_editfees(x):
+        #    self.config.set_key('can_edit_fees', x == Qt.Checked)
+        #    self.update_fee_edit()
+        #add_classic_tip_cb.stateChanged.connect(on_editfees)
+        #add_classic_tip_cb.setToolTip(_('This option lets you edit fees in the send tab.'))
+        tx_widgets.append((add_classic_tip_cb, None))
+
+        msg = _('Bitcoin classic miner tip.') + '\n' \
+              + _("If you enable If you enable 'Send tip to last bitcon classic miner', this parameter will be used as tip amount in BTCs.")
+        tip_label = HelpLabel(_('Bitcoin classic miner tip') + ':', msg)
+        tip_e = BTCAmountEdit(self.get_decimal_point)
+        tip_e.setAmount(self.config.get('fee_per_kb', bitcoin.RECOMMENDED_FEE))
+        #def on_fee(is_done):
+        #    if self.config.get('dynamic_fees'):
+        #        return
+        #    v = tip_e.get_amount() or 0
+        #    self.config.set_key('fee_per_kb', v, is_done)
+        #    self.update_fee()
+        #tip_e.editingFinished.connect(lambda: on_fee(True))
+        #tip_e.textEdited.connect(lambda: on_fee(False))
+        tx_widgets.append((tip_label, tip_e))
+
+
         tabs_info = [
             (tx_widgets, _('Transactions')),
             (gui_widgets, _('Appearance')),
