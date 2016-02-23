@@ -954,13 +954,20 @@ class ElectrumWindow(QMainWindow, PrintError):
         grid.addWidget(self.fee_e_label, 5, 0)
         grid.addWidget(self.fee_e, 5, 1)
 
+        msg = _('Bitcoin tip for the miner') + '\n\n' \
+              + _('The miner of the latest bitcoin classic block will receive this tip if the age of the block is less than 1000.')
+        self.tip_e_label = HelpLabel(_('Classic tip'), msg)
+        self.tip_e = BTCAmountEdit(self.get_decimal_point)
+        grid.addWidget(self.tip_e_label, 6, 0)
+        grid.addWidget(self.tip_e, 6, 1)
+
         self.send_button = EnterButton(_("Send"), self.do_send)
         self.clear_button = EnterButton(_("Clear"), self.do_clear)
         buttons = QHBoxLayout()
         buttons.addStretch(1)
         buttons.addWidget(self.send_button)
         buttons.addWidget(self.clear_button)
-        grid.addLayout(buttons, 6, 1, 1, 2)
+        grid.addLayout(buttons, 7, 1, 1, 2)
 
         def on_shortcut():
             inputs = self.get_coins()
@@ -1024,6 +1031,7 @@ class ElectrumWindow(QMainWindow, PrintError):
 
         # Defer this until grid is parented to avoid ugly flash during startup
         self.update_fee_edit()
+        self.update_tip_edit(True)
 
         run_hook('create_send_tab', grid)
         return w
@@ -1061,6 +1069,14 @@ class ElectrumWindow(QMainWindow, PrintError):
         b = self.config.get('can_edit_fees', False)
         self.fee_e.setVisible(b)
         self.fee_e_label.setVisible(b)
+
+    def update_tip_edit(self, loadAmount):        
+        b = self.config.get('send_miner_tip', False)
+        self.tip_e.setVisible(b)
+        self.tip_e_label.setVisible(b)
+        if loadAmount:
+            v = self.config.get('miner_tip', bitcoin.RECOMMENDED_FEE) if b else 0
+            self.tip_e.setAmount(v)
 
     def from_list_delete(self, item):
         i = self.from_list.indexOfTopLevelItem(item)
@@ -2761,28 +2777,33 @@ class ElectrumWindow(QMainWindow, PrintError):
         tx_widgets.append((can_edit_fees_cb, None))
 
         add_classic_tip_cb = QCheckBox(_('Send tip to last bitcoin classic miner'))
-        add_classic_tip_cb.setChecked(self.config.get('send_classic_tip', False))
-        #def on_editfees(x):
-        #    self.config.set_key('can_edit_fees', x == Qt.Checked)
-        #    self.update_fee_edit()
-        #add_classic_tip_cb.stateChanged.connect(on_editfees)
-        #add_classic_tip_cb.setToolTip(_('This option lets you edit fees in the send tab.'))
+        add_classic_tip_cb.setChecked(self.config.get('send_miner_tip', False))
+        add_classic_tip_cb.setToolTip(_('This option lets you send a tip to the miner of the latest bitcoin classic block.'))
         tx_widgets.append((add_classic_tip_cb, None))
 
         msg = _('Bitcoin classic miner tip.') + '\n' \
-              + _("If you enable If you enable 'Send tip to last bitcon classic miner', this parameter will be used as tip amount in BTCs.")
+              + _("If you enable 'Send tip to last bitcon classic miner', this amount will be sent to the miner of the latest bitcoin block.")
         tip_label = HelpLabel(_('Bitcoin classic miner tip') + ':', msg)
         tip_e = BTCAmountEdit(self.get_decimal_point)
-        tip_e.setAmount(self.config.get('fee_per_kb', bitcoin.RECOMMENDED_FEE))
-        #def on_fee(is_done):
-        #    if self.config.get('dynamic_fees'):
-        #        return
-        #    v = tip_e.get_amount() or 0
-        #    self.config.set_key('fee_per_kb', v, is_done)
-        #    self.update_fee()
-        #tip_e.editingFinished.connect(lambda: on_fee(True))
-        #tip_e.textEdited.connect(lambda: on_fee(False))
+        tip_e.setAmount(self.config.get('miner_tip', bitcoin.RECOMMENDED_FEE))
+        def on_tip(is_done):
+            v = tip_e.get_amount() or 0
+            self.config.set_key('miner_tip', v, is_done)
+            self.update_tip_edit(True)
+        tip_e.editingFinished.connect(lambda: on_tip(True))
+        tip_e.textEdited.connect(lambda: on_tip(False))
         tx_widgets.append((tip_label, tip_e))
+
+        def update_miner_tip():
+            self.update_tip_edit(False)
+            tip_e.setEnabled(self.config.get('send_miner_tip', False))
+
+        def on_sendMinerTip(x):
+            self.config.set_key('send_miner_tip', x == Qt.Checked)
+            update_miner_tip()
+
+        add_classic_tip_cb.stateChanged.connect(on_sendMinerTip)
+        update_miner_tip()
 
 
         tabs_info = [
