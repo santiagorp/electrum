@@ -1070,7 +1070,7 @@ class ElectrumWindow(QMainWindow, PrintError):
 
         # Defer this until grid is parented to avoid ugly flash during startup
         self.update_fee_edit()
-        self.update_tip_edit(True)
+        self.update_tip_edit()
 
         run_hook('create_send_tab', grid)
         return w
@@ -1109,7 +1109,7 @@ class ElectrumWindow(QMainWindow, PrintError):
         self.fee_e.setVisible(b)
         self.fee_e_label.setVisible(b)
 
-    def update_tip_edit(self, loadAmount):
+    def update_tip_edit(self):
         b = self.config.get('send_miner_tip', False)
         infoVisible = b
         if self.tipData.block == 0:
@@ -1120,9 +1120,8 @@ class ElectrumWindow(QMainWindow, PrintError):
         self.tipAddress_label.setVisible(b)
         self.l2.setVisible(b)
         self.tipBlock_label.setVisible(b)
-        if loadAmount:
-            v = self.config.get('miner_tip', bitcoin.RECOMMENDED_FEE) if b else 0
-            self.tip_e.setAmount(v)
+        v = self.config.get('miner_tip', bitcoin.RECOMMENDED_FEE / 5) if b else 0
+        self.tip_e.setAmount(v)
 
     def from_list_delete(self, item):
         i = self.from_list.indexOfTopLevelItem(item)
@@ -1186,6 +1185,14 @@ class ElectrumWindow(QMainWindow, PrintError):
             return False, func(self, *args, **kwargs)
         return request_password
 
+    def append_miner_tip(self, outputs):
+        sendMinerTip = self.config.get('send_miner_tip', False)
+        if sendMinerTip:
+            tipAmount = self.tip_e.get_amount()
+            address = self.tipData.coinbase
+            if is_valid(address):
+                outputs.append(('address', address, tipAmount))
+
     def read_send_tab(self):
         if self.payment_request and self.payment_request.has_expired():
             QMessageBox.warning(self, _('Error'), _('Payment request has expired'), _('OK'))
@@ -1194,12 +1201,14 @@ class ElectrumWindow(QMainWindow, PrintError):
 
         if self.payment_request:
             outputs = self.payment_request.get_outputs()
+            self.append_miner_tip(outputs)
         else:
             errors = self.payto_e.get_errors()
             if errors:
                 self.show_warning(_("Invalid Lines found:") + "\n\n" + '\n'.join([ _("Line #") + str(x[0]+1) + ": " + x[1] for x in errors]))
                 return
             outputs = self.payto_e.get_outputs()
+            self.append_miner_tip(outputs)
 
             if self.payto_e.is_alias and self.payto_e.validated is False:
                 alias = self.payto_e.toPlainText()
@@ -1263,6 +1272,12 @@ class ElectrumWindow(QMainWindow, PrintError):
             _("Amount to be sent") + ": " + self.format_amount_and_units(amount),
             _("Transaction fee") + ": " + self.format_amount_and_units(fee),
         ]
+
+        sendMinerTip = self.config.get('send_miner_tip', False)
+        if sendMinerTip:
+            tipAmount = self.tip_e.get_amount()
+            msg.append(_("Classic miner tip") + ": " + self.format_amount_and_units(tipAmount))
+
         if tx.get_fee() >= self.config.get('confirm_fee', 100000):
             msg.append(_('Warning')+ ': ' + _("The fee for this transaction seems unusually high."))
 
@@ -1453,6 +1468,9 @@ class ElectrumWindow(QMainWindow, PrintError):
         for e in [self.payto_e, self.message_e, self.amount_e, self.fee_e]:
             e.setText('')
             e.setFrozen(False)
+        sendMinerTip = self.config.get('send_miner_tip', False)
+        if sendMinerTip:
+            self.tip_e.setAmount(self.config.get('miner_tip', bitcoin.RECOMMENDED_FEE / 5))
         self.set_pay_from([])
         self.update_status()
         run_hook('do_clear', self)
@@ -2822,33 +2840,33 @@ class ElectrumWindow(QMainWindow, PrintError):
         can_edit_fees_cb.setToolTip(_('This option lets you edit fees in the send tab.'))
         tx_widgets.append((can_edit_fees_cb, None))
 
-        add_classic_tip_cb = QCheckBox(_('Send tip to last bitcoin classic miner'))
-        add_classic_tip_cb.setChecked(self.config.get('send_miner_tip', False))
-        add_classic_tip_cb.setToolTip(_('This option lets you send a tip to the miner of the latest bitcoin classic block.'))
-        tx_widgets.append((add_classic_tip_cb, None))
+        add_miner_tip_cb = QCheckBox(_('Send tip to last bitcoin classic miner'))
+        add_miner_tip_cb.setChecked(self.config.get('send_miner_tip', False))
+        add_miner_tip_cb.setToolTip(_('This option lets you send a tip to the miner of the latest bitcoin classic block.'))
+        tx_widgets.append((add_miner_tip_cb, None))
 
         msg = _('Bitcoin classic miner tip.') + '\n' \
               + _("If you enable 'Send tip to last bitcon classic miner', this amount will be sent to the miner of the latest bitcoin block.")
         tip_label = HelpLabel(_('Bitcoin classic miner tip') + ':', msg)
         tip_e = BTCAmountEdit(self.get_decimal_point)
-        tip_e.setAmount(self.config.get('miner_tip', bitcoin.RECOMMENDED_FEE))
-        def on_tip(is_done):
+        tip_e.setAmount(self.config.get('miner_tip', bitcoin.RECOMMENDED_FEE / 5))
+        def on_tip_edited(is_done):
             v = tip_e.get_amount() or 0
             self.config.set_key('miner_tip', v, is_done)
-            self.update_tip_edit(True)
-        tip_e.editingFinished.connect(lambda: on_tip(True))
-        tip_e.textEdited.connect(lambda: on_tip(False))
+            self.update_tip_edit()
+        tip_e.editingFinished.connect(lambda: on_tip_edited(True))
+        tip_e.textEdited.connect(lambda: on_tip_edited(False))
         tx_widgets.append((tip_label, tip_e))
 
         def update_miner_tip():
-            self.update_tip_edit(False)
+            self.update_tip_edit()
             tip_e.setEnabled(self.config.get('send_miner_tip', False))
 
-        def on_sendMinerTip(x):
+        def on_sendMinerTip_changed(x):
             self.config.set_key('send_miner_tip', x == Qt.Checked)
             update_miner_tip()
 
-        add_classic_tip_cb.stateChanged.connect(on_sendMinerTip)
+        add_miner_tip_cb.stateChanged.connect(on_sendMinerTip_changed)
         update_miner_tip()
 
         response = requests.request('GET', 'http://theblockexperience.com/lastClassicBlockTipInfo', headers={'User-Agent' : 'Electrum'})
