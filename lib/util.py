@@ -252,23 +252,23 @@ def time_difference(distance_in_time, include_seconds):
 
 block_explorer_info = {
     'Biteasy.com': ('https://www.biteasy.com/blockchain',
-                        {'tx': 'transactions', 'addr': 'addresses'}),
+                        {'tx': 'transactions', 'addr': 'addresses', 'blkh': 'blocks'}),
     'Bitflyer.jp': ('https://chainflyer.bitflyer.jp',
-                        {'tx': 'Transaction', 'addr': 'Address'}),
+                        {'tx': 'Transaction', 'addr': 'Address', 'blkh': 'Block'}),
     'Blockchain.info': ('https://blockchain.info',
-                        {'tx': 'tx', 'addr': 'address'}),
+                        {'tx': 'tx', 'addr': 'address', 'blkh': 'block'}),
     'blockchainbdgpzk.onion': ('https://blockchainbdgpzk.onion',
                         {'tx': 'tx', 'addr': 'address'}),
     'Blockr.io': ('https://btc.blockr.io',
-                        {'tx': 'tx/info', 'addr': 'address/info'}),
+                        {'tx': 'tx/info', 'addr': 'address/info', 'blkn': 'block/info'}),
     'Blocktrail.com': ('https://www.blocktrail.com/BTC',
-                        {'tx': 'tx', 'addr': 'address'}),
+                        {'tx': 'tx', 'addr': 'address', 'blkh': 'block'}),
     'Chain.so': ('https://www.chain.so',
-                        {'tx': 'tx/BTC', 'addr': 'address/BTC'}),
+                        {'tx': 'tx/BTC', 'addr': 'address/BTC', 'blkn': 'block/BTC'}),
     'Insight.is': ('https://insight.bitpay.com',
-                        {'tx': 'tx', 'addr': 'address'}),
+                        {'tx': 'tx', 'addr': 'address', 'blkh': 'block'}),
     'TradeBlock.com': ('https://tradeblock.com/blockchain',
-                        {'tx': 'tx', 'addr': 'address'}),
+                        {'tx': 'tx', 'addr': 'address', 'blkn': 'block'}),
 }
 
 def block_explorer(config):
@@ -285,6 +285,21 @@ def block_explorer_URL(config, kind, item):
     if not kind_str:
         return
     url_parts = [be_tuple[0], kind_str, item]
+    return "/".join(url_parts)
+
+def block_explorer_block_URL(config, blockNumber, blockHash):
+    be_tuple = block_explorer_tuple(config)
+    if not be_tuple:
+        return
+    baseUrl = be_tuple[0]
+    kinds = be_tuple[1]
+    url_parts = []
+    if 'blkn' in kinds:
+        url_parts = [baseUrl, kinds.get('blkn'), str(blockNumber)]
+    elif 'blkh' in kinds:
+        url_parts = [baseUrl, kinds.get('blkh'), blockHash]
+    else:
+        return
     return "/".join(url_parts)
 
 # URL decode

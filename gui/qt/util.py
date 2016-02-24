@@ -7,6 +7,7 @@ import traceback
 import sys
 import threading
 import platform
+import webbrowser
 
 if platform.system() == 'Windows':
     MONOSPACE_FONT = 'Lucida Console'
@@ -139,6 +140,27 @@ class HelpLabel(QLabel):
         self.app.setOverrideCursor(QCursor(Qt.ArrowCursor))
         return QLabel.leaveEvent(self, event)
 
+class LinkLabel(QLabel):
+    def __init__(self, text, url):
+        QLabel.__init__(self, text)
+        self.url = url
+        self.app = QCoreApplication.instance()
+        self.font = QFont()
+
+    def mouseReleaseEvent(self, x):
+        webbrowser.open(self.url)
+
+    def enterEvent(self, event):
+        self.font.setUnderline(True)
+        self.setFont(self.font)
+        self.app.setOverrideCursor(QCursor(Qt.PointingHandCursor))
+        return QLabel.enterEvent(self, event)
+
+    def leaveEvent(self, event):
+        self.font.setUnderline(False)
+        self.setFont(self.font)
+        self.app.setOverrideCursor(QCursor(Qt.ArrowCursor))
+        return QLabel.leaveEvent(self, event)
 
 class HelpButton(QPushButton):
     def __init__(self, text):

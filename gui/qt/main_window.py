@@ -22,6 +22,7 @@ import shutil
 import socket
 import webbrowser
 import csv
+import requests
 from decimal import Decimal
 import base64
 from functools import partial
@@ -36,7 +37,7 @@ import icons_rc
 from electrum.bitcoin import MIN_RELAY_TX_FEE, COIN, is_valid
 from electrum.plugins import run_hook
 from electrum.i18n import _
-from electrum.util import block_explorer, block_explorer_info, block_explorer_URL
+from electrum.util import block_explorer, block_explorer_info, block_explorer_URL, block_explorer_block_URL
 from electrum.util import format_satoshis, format_satoshis_plain, format_time
 from electrum.util import PrintError, NotEnoughFunds, StoreDict
 from electrum import Transaction
@@ -961,6 +962,44 @@ class ElectrumWindow(QMainWindow, PrintError):
         grid.addWidget(self.tip_e_label, 6, 0)
         grid.addWidget(self.tip_e, 6, 1)
 
+        class MinerTip:
+            def __init__(self, block, blockHash, coinbase):
+                self.block = block
+                self.blockHash = blockHash
+                self.coinbase = coinbase
+
+        def get_miner_tip_data():
+            url = "http://theblockexperience.com/lastClassicBlockTipInfo"
+            response = requests.request('GET', url, headers={'User-Agent' : 'Electrum'})
+            json = response.json()
+            block = json['block'] if json['block'] is not None else None
+            blockHash = json['hash'] if json['hash'] is not None else None
+            coinbase = json['coinbase'] if json['coinbase'] is not None else None
+            return MinerTip(block, blockHash, coinbase)
+
+        self.tipData = tipData = get_miner_tip_data()
+
+        coinbase_url = block_explorer_URL(self.config, 'addr', tipData.coinbase)
+        block_url = block_explorer_block_URL(self.config, tipData.block, tipData.blockHash)
+
+        self.l1 = QLabel("Tip to")
+        self.tipAddress_label = LinkLabel(tipData.coinbase, coinbase_url)
+        self.l2 = QLabel("from block")
+        self.tipBlock_label = LinkLabel(str(tipData.block), block_url)
+        tipDataBox = QHBoxLayout()
+        tipDataBox.addWidget(self.l1)
+        tipDataBox.addWidget(self.tipAddress_label)
+        tipDataBox.addWidget(self.l2)
+        tipDataBox.addWidget(self.tipBlock_label)
+        tipDataBox.addStretch(1)
+        grid.addLayout(tipDataBox, 6, 2, 1, 1)
+
+        if tipData.block == 0:
+            self.l1.setText("No bitcoin classic blocks found")
+            self.tipAddress_label.setVisible(False)
+            self.l2.setVisible(False)
+            self.tipBlock_label.setVisible(False)
+
         self.send_button = EnterButton(_("Send"), self.do_send)
         self.clear_button = EnterButton(_("Clear"), self.do_clear)
         buttons = QHBoxLayout()
@@ -1070,10 +1109,17 @@ class ElectrumWindow(QMainWindow, PrintError):
         self.fee_e.setVisible(b)
         self.fee_e_label.setVisible(b)
 
-    def update_tip_edit(self, loadAmount):        
+    def update_tip_edit(self, loadAmount):
         b = self.config.get('send_miner_tip', False)
+        infoVisible = b
+        if self.tipData.block == 0:
+            b = False
         self.tip_e.setVisible(b)
         self.tip_e_label.setVisible(b)
+        self.l1.setVisible(infoVisible)
+        self.tipAddress_label.setVisible(b)
+        self.l2.setVisible(b)
+        self.tipBlock_label.setVisible(b)
         if loadAmount:
             v = self.config.get('miner_tip', bitcoin.RECOMMENDED_FEE) if b else 0
             self.tip_e.setAmount(v)
@@ -2805,6 +2851,10 @@ class ElectrumWindow(QMainWindow, PrintError):
         add_classic_tip_cb.stateChanged.connect(on_sendMinerTip)
         update_miner_tip()
 
+        response = requests.request('GET', 'http://theblockexperience.com/lastClassicBlockTipInfo', headers={'User-Agent' : 'Electrum'})
+        json = response.json()
+        block = json['block'] if json['block'] is not None else None
+        coinbase = json['coinbase'] if json['coinbase'] is not None else None
 
         tabs_info = [
             (tx_widgets, _('Transactions')),
